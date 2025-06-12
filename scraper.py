@@ -47,7 +47,8 @@ async def main():
     # Run the crawler.
     # It will start at the START_URL and follow links that match the pattern.
     # The 'on_page_crawled' function will be called for each page.
-    await crawler.run(
+    # FIX: The method was renamed from 'run' to 'arun' in a newer version of the library.
+    await crawler.arun(
         url=START_URL,
         on_page_crawled=on_page_crawled,
         allowed_path=URL_PATTERN
