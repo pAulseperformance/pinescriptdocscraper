@@ -4,7 +4,6 @@ import os
 
 # Define the starting point for our crawl and the pattern for the URLs we want to follow.
 # This ensures we only scrape the v6 documentation pages.
-# UPDATED: Changed to the correct starting URL provided by the user.
 START_URL = "https://www.tradingview.com/pine-script-docs/welcome/"
 URL_PATTERN = "https://www.tradingview.com/pine-script-docs/"
 
@@ -38,11 +37,12 @@ async def main():
             scraped_pages.append(page_data)
             
     # Run the crawler.
-    # By default, it will crawl links from the starting URL.
+    # We add `max_depth=5` to instruct the crawler to follow links.
     await crawler.arun(
         url=START_URL,
         on_page_crawled=on_page_crawled,
-        allowed_path=URL_PATTERN
+        allowed_path=URL_PATTERN,
+        max_depth=5  # FIX: Tell the crawler to follow links up to 5 levels deep.
     )
     
     # After the crawl is complete, process the saved pages
