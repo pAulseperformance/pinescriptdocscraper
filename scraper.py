@@ -42,7 +42,8 @@ async def main():
         stream=True  # Process pages as they are crawled
     )
 
-    scraped_pages_data =
+    # FIX: Initialize scraped_pages_data as an empty list
+    scraped_pages_data = []
     pages_visited_count = 0
 
     # Perform the deep crawl. This will yield CrawlResult objects as pages are processed.
