@@ -1,5 +1,5 @@
 import asyncio
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, BrowserConfig
 import os
 
 # Define the starting point for our crawl and the pattern for the URLs we want to follow.
@@ -21,8 +21,22 @@ async def main():
 
     # --- STEP 1: Discover all documentation links from the start page ---
     print(f"--- Step 1: Discovering links from {START_URL} ---")
-    # Run the crawler on the single start URL just to get its data
-    start_page_data = await crawler.arun(url=START_URL)
+
+    # FIX: Create a more robust configuration to ensure JavaScript renders properly.
+    # This tells the headless browser to wait for dynamic content.
+    run_config = CrawlerRunConfig(
+        browser_config=BrowserConfig(
+            headless=True,
+            use_javascript=True, # Explicitly enable JavaScript rendering
+            wait_for_selector="nav" # Wait until the main navigation element appears on the page
+        )
+    )
+
+    # Run the crawler on the single start URL with our new, robust config.
+    start_page_data = await crawler.arun(
+        url=START_URL,
+        config=run_config
+    )
     
     if not start_page_data or not start_page_data.links:
         print("Error: Could not retrieve links from the start page.")
@@ -33,10 +47,10 @@ async def main():
     
     # --- LOGGING: Print discovered links for debugging ---
     print(f"\nFound {len(doc_links)} unique documentation links to scrape:")
-    for link in sorted(list(doc_links))[:10]: # Print first 10 for brevity
+    for link in sorted(list(doc_links))[:15]: # Print first 15 for brevity
         print(f"  - {link}")
-    if len(doc_links) > 10:
-        print(f"  - ... and {len(doc_links) - 10} more.")
+    if len(doc_links) > 15:
+        print(f"  - ... and {len(doc_links) - 15} more.")
 
     if not doc_links:
         print("\nNo documentation links were found. Exiting.")
@@ -53,7 +67,8 @@ async def main():
     # Use arun_many to process our specific list of URLs
     await crawler.arun_many(
         urls=list(doc_links),
-        on_page_crawled=on_page_crawled
+        on_page_crawled=on_page_crawled,
+        config=run_config # Use the same robust config for all pages
     )
 
     # --- STEP 3: Save the scraped content to files ---
