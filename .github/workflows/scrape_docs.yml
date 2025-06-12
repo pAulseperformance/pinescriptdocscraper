@@ -40,12 +40,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Step 4: Run the scraper script
+      # Step 4: Install Playwright Browsers (FIX)
+      # This new step downloads the necessary browser executable (e.g., Chromium).
+      - name: Install Playwright Browsers
+        run: playwright install
+
+      # Step 5: Run the scraper script
       # This executes your Python script, which creates/updates the knowledge_base folder.
       - name: Run Python scraper
         run: python scraper.py
 
-      # Step 5: Commit and push changes
+      # Step 6: Commit and push changes
       # This step checks if the scraper created any new or updated files in the
       # knowledge_base directory and commits them back to your repository.
       - name: Commit and push if there are changes
