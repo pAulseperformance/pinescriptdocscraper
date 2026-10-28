@@ -256,19 +256,26 @@ footer{border-top:1px solid var(--line);padding:16px 34px;color:var(--mut);font-
 .hit:hover{border-color:#c9d4ff;background:#f7f9ff}
 .hit .t{font-weight:600}.hit .s{color:var(--mut);font-size:13px;margin-top:3px}
 .hit mark{background:#fff2a8}
+.hits{margin:0 0 18px}
 @media print{header,nav,#q,.hits{display:none}main{padding:0}.wrap{display:block}}
 """
 
 OFFLINE_JS = """
+// Both innerHTML sinks below are ours: P and TXT are baked into this file at
+// build time from pages this pipeline saved, and a slug is a path from the same
+// manifest. Nothing here takes input from a reader - the search box only reads
+// the query and renders a slice of TXT escaped with &lt; - so there is no path
+// from a visitor's text to markup.
 const P=%PAGES%, TXT=%TEXT%;
 const q=document.getElementById('q'), hits=document.getElementById('hits');
-const main=document.getElementById('main'), nav=document.getElementById('nav');
+const main=document.getElementById('page'), nav=document.getElementById('nav');
 function show(slug){
   const p=P[slug]; if(!p) return;
   main.innerHTML=p.h; document.title=p.t+' - Pine Script manual';
+  hits.innerHTML=''; q.value='';
   for(const a of nav.querySelectorAll('a')) a.classList.toggle('on',a.dataset.s===slug);
   try{localStorage.setItem('pslast',slug)}catch(e){}
-  window.scrollTo(0,0); main.focus();
+  window.scrollTo(0,0); document.getElementById('main').focus();
 }
 function index(){
   if(!q.value.trim()){hits.innerHTML='';return}
@@ -395,7 +402,7 @@ def build_offline(version: str, manifest: dict) -> Path:
 </header>
 <div class="wrap">
   <nav id="nav">{''.join(nav_html)}</nav>
-  <main id="main" tabindex="-1"></main>
+  <main id="main" tabindex="-1"><div id="hits" class="hits"></div><div id="page"></div></main>
 </div>
 <footer>
   Source: TradingView Pine Script User Manual, https://www.tradingview.com/pine-script-docs/
