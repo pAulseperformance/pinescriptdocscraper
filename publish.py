@@ -110,6 +110,9 @@ def main() -> int:
     ap.add_argument("--skip-scrape", action="store_true")
     ap.add_argument("--force-build", action="store_true",
                     help="rebuild even when the mirrored pages are byte-identical to the last run")
+    ap.add_argument("--force-fetch", action="store_true",
+                    help="re-download every page instead of reading the on-disk cache. A scheduled "
+                         "run MUST pass this: the cache makes a refresh a no-op that looks clean")
     ap.add_argument("--deploy", action="store_true")
     ap.add_argument("--commit", action="store_true",
                     help="commit the declaration change (numbers only) and leave the deploy to a person")
@@ -141,7 +144,10 @@ def main() -> int:
         if not a.skip_scrape:
             say(f"--- scraping {v} ---")
             with sink:
-                refresh.scrape(v)
+                # force=… is what makes this a refresh. Without it every page comes
+                # from .cache/ and a monthly job would read its own last download,
+                # report "nothing moved" every month, and never see a TradingView edit.
+                refresh.scrape(v, force=a.force_fetch)
         mpath = KB / v / "manifest.json"
         if not mpath.exists():
             say(f"  {v}: no mirror, skipped")
