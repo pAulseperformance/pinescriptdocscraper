@@ -1,0 +1,8 @@
+# Regenerable, and not ours to publish: the mirror is TradingView's manual.
+# refresh.py rebuilds all of it from the docs site, so the repo carries the
+# procedure and the site repo carries the packaged artifact.
+knowledge_base/
+dist/
+.cache/
+__pycache__/
+*.pyc
