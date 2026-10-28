@@ -208,7 +208,15 @@ def scrape(version: str, force: bool = False) -> dict:
                 queue.append((href if href.endswith("/") else href + "/", depth + 1))
 
     ok = {k: v for k, v in seen.items() if v.get("ok")}
+    # A fingerprint of the CONTENT, not of the artifacts: Chrome writes a fresh
+    # creation date into every PDF it prints, so two builds of identical pages
+    # differ in bytes. Drift is decided here, on the source, and the packages are
+    # rebuilt only when this value moves.
+    content_hash = hashlib.sha256(
+        "\n".join(f"{slug}:{ok[slug]['sha256']}" for slug in sorted(ok)).encode()
+    ).hexdigest()[:16]
     manifest = {
+        "content_hash": content_hash,
         "version": version, "prefix": prefix,
         "source": "TradingView Pine Script User Manual",
         "scraped_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
@@ -387,7 +395,7 @@ def build_offline(version: str, manifest: dict) -> Path:
         for s in slugs:
             nav_html.append(f'<a href="#" data-s="{html.escape(s)}">{html.escape(bundle[s]["t"])}</a>')
 
-    stamp = manifest["scraped_at"][:10]
+    stamp = fetched_day(manifest)
     label = "v6" if version == "v6" else version
     doc = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -424,7 +432,7 @@ def build_offline(version: str, manifest: dict) -> Path:
         f"Content (c) TradingView, Inc. This mirror exists so members can read the\n"
         f"manual without a connection. It is not affiliated with or endorsed by\n"
         f"TradingView.\n\n"
-        f"Pages: {len(pages)}\nFetched: {manifest['scraped_at']}\n"
+        f"Pages: {len(pages)}\nFetched: {manifest['scraped_at']} (UTC), {stamp} (ICT)\n"
         f"Rebuilt by refresh.py in the pinescriptdocscraper repo.\n"
     )
     zip_path = DIST / f"pine-script-docs-{version}-offline.zip"
@@ -456,6 +464,19 @@ img{max-width:100%}aside{background:#fffdf3;border-left:3px solid #f7b500;paddin
 """
 
 
+def fetched_day(manifest: dict) -> str:
+    """The day the pages were fetched, on the owner's calendar.
+
+    `scraped_at` is UTC, and a fetch at 18:00Z is already the next morning in
+    Bangkok. The date printed on the page is read by a person in ICT, so it is
+    converted rather than sliced: a UTC day would label tonight's mirror with
+    yesterday's date.
+    """
+    ict = dt.timezone(dt.timedelta(hours=7))
+    ts = dt.datetime.fromisoformat(manifest["scraped_at"])
+    return ts.astimezone(ict).date().isoformat()
+
+
 def count_figures(version: str, manifest: dict) -> int:
     """How many distinct figures the manual carries. Counted, not downloaded."""
     urls: set[str] = set()
@@ -472,7 +493,7 @@ def build_pdf(version: str, manifest: dict) -> Path | None:
         print("  no chrome-headless-shell, PDF skipped", flush=True)
         return None
     pages = manifest["pages"]
-    stamp = manifest["scraped_at"][:10]
+    stamp = fetched_day(manifest)
     label = "v6" if version == "v6" else version
     # Figures are deliberately not embedded. 827 raster screenshots pushed the PDF
     # past 60 MB, which is a worse download than a PDF without them; the HTML
