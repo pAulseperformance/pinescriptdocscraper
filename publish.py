@@ -92,6 +92,32 @@ def upload(path: Path) -> None:
         "--file", str(path), "--content-type", ctype, "--remote"], cwd=SITE)
 
 
+def publish_manifest(entries: dict[str, dict]) -> None:
+    """Write the sizes the site serves, beside the files, so the page can read them.
+
+    WHY. Until 2026-10-29 the page printed byte counts baked into its bundle, so a
+    refresh had to be followed by a deploy or the page advertised a size the file
+    no longer had. This manifest is the file's own answer: the page fetches it at
+    load, and a refresh needs no deploy at all.
+
+    It is written AFTER every upload and after every readback, so a number in it
+    has been measured from the object that is actually stored.
+    """
+    import json
+    payload = {
+        "generatedOn": dt.date.today().isoformat(),
+        "packages": [
+            {"file": name, **{k: v for k, v in info.items() if v is not None}}
+            for name, info in sorted(entries.items())
+        ],
+    }
+    path = DIST / "manifest.json"
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"manifest: {len(payload['packages'])} packages -> {path.name}", flush=True)
+    sh([*WRANGLER, "r2", "object", "put", f"{BUCKET}/{PREFIX}/manifest.json",
+        "--file", str(path), "--content-type", "application/json", "--remote"], cwd=SITE)
+
+
 def served_size(name: str) -> int:
     """Read the object back and count the bytes. A put that 'succeeded' is not a
     measurement; this is."""
@@ -175,12 +201,14 @@ def main() -> int:
         say(f"  UNDECLARED artifacts (not on the page, not uploaded): {undeclared}")
 
     changed: list[str] = []
+    served_sizes: dict[str, int] = dict()
     for name, info in produced.items():
         if name not in known:
             continue
         say(f"--- publishing {name} ({info['bytes']:,} B) ---")
         upload(DIST / name)
         served = served_size(name)
+        served_sizes[name] = served
         if served != info["bytes"]:
             print(f"  SERVED SIZE MISMATCH: built {info['bytes']:,}, served {served:,}", flush=True)
             return 1
@@ -190,6 +218,19 @@ def main() -> int:
             if patch_declaration(name, bytes_=info["bytes"], pages=info["pages"],
                                  figures=info["figures"], day=info["day"]):
                 changed.append(name)
+
+    # The manifest goes up whatever else happened: it carries the served sizes,
+    # and it is what lets the page stop depending on a deploy to be accurate.
+    fresh = declared()
+    manifest_entries = {}
+    for name, info in fresh.items():
+        manifest_entries[name] = {
+            "bytes": served_sizes.get(name) or info["bytes"],
+            "pages": info["pages"],
+            "figures": info["figures"],
+            "mirroredOn": info["mirroredOn"],
+        }
+    publish_manifest(manifest_entries)
 
     if not changed:
         # Either the source had not moved (nothing was rebuilt, so the served
